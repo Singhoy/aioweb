@@ -24,7 +24,7 @@ async def create_pool(loop, **kwargs):
     )
 
 
-async def execute(sql, *args, autocommit=True):
+async def execute(sql, args, autocommit=True):
     log(sql)
     async with __pool.get() as con:
         if not autocommit:
@@ -210,6 +210,7 @@ class Model(dict, metaclass=ModelMetaclass):
     async def save(self):
         args = list(map(self.get_value_or_default, self.__fields__))
         args.append(self.get_value_or_default(self.__primary_key__))
+        print(args)
         rows = await execute(self.__insert__, args)
         if rows != 1:
             logging.warning(f"Failed to insert record: affected rows: {rows}")
