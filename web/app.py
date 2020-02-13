@@ -111,7 +111,7 @@ async def response_factory(app, handler):
                 resp.content_type = "application/json;charset=utf-8"
                 return resp
             else:
-                resp = web.Response(body=app["__template__"].get_template(template).render(**r).encode("utf8"))
+                resp = web.Response(body=app["__templating__"].get_template(template).render(**r).encode("utf8"))
                 resp.content_type = "text/html;charset=utf-8"
                 return resp
         if isinstance(r, int) and 100 <= r < 600:
@@ -121,7 +121,8 @@ async def response_factory(app, handler):
             if isinstance(r, int) and 100 <= r < 600:
                 return web.Response(t, str(m))
         resp = web.Response(body=str(r).encode("utf8"))
-        resp.content_type = "text/plaiin;charset=utf-8"
+        resp.content_type = "text/plain;charset=utf-8"
+        return resp
 
     return response
 
