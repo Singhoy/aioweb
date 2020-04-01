@@ -112,7 +112,7 @@ def hav_request_arg(fn):
         if found and (
                 param.kind != inspect.Parameter.VAR_POSITIONAL and param.kind != inspect.Parameter.KEYWORD_ONLY and param.kind != inspect.Parameter.VAR_KEYWORD):
             raise ValueError(
-                f"Request parameter must be the last named parameter in function: {fn.__name__}, {str(sig)}")
+                f"Request parameter must be the last named parameter in function: {fn.__name__}{str(sig)}")
     return found
 
 

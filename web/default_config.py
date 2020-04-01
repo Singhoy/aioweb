@@ -8,6 +8,6 @@ configs = {
         "db": "aioweb"
     },
     "session": {
-        "secret": "Aioweb"
+        "secret": "AioWeb"
     }
 }

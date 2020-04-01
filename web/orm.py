@@ -33,6 +33,7 @@ async def execute(sql, args, autocommit=True):
             async with con.cursor(aiomysql.DictCursor) as cur:
                 await cur.execute(sql.replace("?", "%s"), args)
                 affected = cur.rowcount
+            await cur.close()
             if not autocommit:
                 await con.commit()
         except BaseException as e:
@@ -49,14 +50,13 @@ async def select(sql, args, size=None):
         async with con.cursor(aiomysql.DictCursor) as cur:
             await cur.execute(sql.replace("?", "%s"), args or ())
             rs = await cur.fetchmany(size) if size else await cur.fetchall()
+        await cur.close()
         logging.info(f"Rows returned: {len(rs)}")
         return rs
 
 
 def create_args_string(num):
-    lis = []
-    for _ in range(num):
-        lis.append("?")
+    lis = ["?" for _ in range(num)]
     return ", ".join(lis)
 
 
@@ -68,7 +68,7 @@ class Field(object):
         self.default = default
 
     def __str__(self):
-        return f"<{self.__class__.__name__}, {self.column_type}: {self.name}>"
+        return f"<{self.__class__.__name__}, {self.column_type}:{self.name}>"
 
 
 class BooleanField(Field):
@@ -120,15 +120,15 @@ class ModelMetaclass(type):
             raise Exception("Primary key not found.")
         for k in mappings.keys():
             attrs.pop(k)
-        escaped_fields = list(map(lambda f: f"`{f}`", fields))
+        escaped_fields = list(map(lambda a: f"`{a}`", fields))
         attrs["__mappings__"] = mappings  # 保存属性和列的映射关系
         attrs["__table__"] = table_name
         attrs["__primary_key__"] = primary_key  # 主键属性名
         attrs["__fields__"] = fields  # 除主键外的属性名
-        attrs["__select__"] = f"""select `{primary_key}`, {', '.join(escaped_fields)} from `{table_name}`"""
-        attrs["__insert__"] = f"""insert into `{table_name}` ({', '.join(
+        attrs["__select__"] = f"""select `{primary_key}`, {", ".join(escaped_fields)} from `{table_name}`"""
+        attrs["__insert__"] = f"""insert into `{table_name}` ({", ".join(
             escaped_fields)}, `{primary_key}`) values ({create_args_string(len(escaped_fields) + 1)})"""
-        attrs["__update__"] = f"""update `{table_name}` set {', '.join(
+        attrs["__update__"] = f"""update `{table_name}` set {", ".join(
             map(lambda f: f"`{mappings.get(f).name or f}`=?", fields))} where `{primary_key}`=?"""
         attrs["__delete__"] = f"""delete from `{table_name}` where `{primary_key}`=?"""
         return type.__new__(mcs, name, bases, attrs)
@@ -210,7 +210,6 @@ class Model(dict, metaclass=ModelMetaclass):
     async def save(self):
         args = list(map(self.get_value_or_default, self.__fields__))
         args.append(self.get_value_or_default(self.__primary_key__))
-        print(args)
         rows = await execute(self.__insert__, args)
         if rows != 1:
             logging.warning(f"Failed to insert record: affected rows: {rows}")

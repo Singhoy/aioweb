@@ -10,6 +10,8 @@ from jinja2 import Environment, FileSystemLoader
 
 import orm
 from coroweb import add_routes, add_static
+from config import configs
+from handlers import COOKIE_NAME, cookie2user
 
 logging.basicConfig(level=logging.INFO)
 
@@ -50,6 +52,23 @@ def init_jinja2(app, **kwargs):
     app["__templating__"] = env
 
 
+async def auth_factory(app, handler):
+    async def auth(request):
+        logging.info(f"Check user: {request.method} {request.path}")
+        request.__user__ = None
+        cookie_str = request.cookies.get(COOKIE_NAME)
+        if cookie_str:
+            user = await cookie2user(cookie_str)
+            if user:
+                logging.info(f"Set current user: {user.email}")
+                request.__user__ = user
+        if request.path.startswith("/manage/") and (request.__user__ is None or not request.__user__.admin):
+            return web.HTTPFound("/login")
+        return await handler(request)
+
+    return auth
+
+
 async def data_factory(app, handler):
     async def parse_data(request):
         if request.method == "POST":
@@ -65,9 +84,9 @@ async def data_factory(app, handler):
 
 
 async def init(loop):
-    await orm.create_pool(loop=loop, host="127.0.0.1", port=3306, user="www", password="123", db="aioweb")
+    await orm.create_pool(loop=loop, **configs.db)
     app = web.Application(loop=loop, middlewares=[
-        logger_factory, response_factory
+        auth_factory, logger_factory, response_factory
     ])
     init_jinja2(app, filters=dict(datetime=datetime_filter))
     add_routes(app, "handlers")
@@ -111,14 +130,15 @@ async def response_factory(app, handler):
                 resp.content_type = "application/json;charset=utf-8"
                 return resp
             else:
+                r["__user__"] = request.__user__
                 resp = web.Response(body=app["__templating__"].get_template(template).render(**r).encode("utf8"))
                 resp.content_type = "text/html;charset=utf-8"
                 return resp
-        if isinstance(r, int) and 100 <= r < 600:
-            return web.Response(r)
+        if isinstance(r, int) and 100 <= t < 600:
+            return web.Response(t)
         if isinstance(r, tuple) and len(r) == 2:
             t, m = r
-            if isinstance(r, int) and 100 <= r < 600:
+            if isinstance(r, int) and 100 <= t < 600:
                 return web.Response(t, str(m))
         resp = web.Response(body=str(r).encode("utf8"))
         resp.content_type = "text/plain;charset=utf-8"

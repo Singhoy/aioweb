@@ -21,7 +21,7 @@ if (!String.prototype.trim) {
     };
 }
 
-if (!Number.prototype.toDateString) {
+if (!Number.prototype.toDateTime) {
     let replaces = {
         'yyyy': function (dt) {
             return dt.getFullYear().toString();
@@ -29,20 +29,26 @@ if (!Number.prototype.toDateString) {
         'yy': function (dt) {
             return (dt.getFullYear() % 100).toString();
         },
+        /**
+         * @return {string}
+         */
         'MM': function (dt) {
             let m = dt.getMonth() + 1;
             return m < 10 ? '0' + m : m.toString();
         },
+        /**
+         * @return {string}
+         */
         'M': function (dt) {
             let m = dt.getMonth() + 1;
             return m.toString();
         },
         'dd': function (dt) {
-            let d = dt.getDate();
+            const d = dt.getDate();
             return d < 10 ? '0' + d : d.toString();
         },
         'd': function (dt) {
-            let d = dt.getDate();
+            const d = dt.getDate();
             return d.toString();
         },
         'hh': function (dt) {
@@ -178,9 +184,9 @@ function Template(tpl) {
         fn,
         match,
         code = ['let r = [];\nlet _html = function (str) { return str.replace(/&/g, \'&amp;\').replace(/"/g, \'&quot;\').replace(/\'/g, \'&#39;\').replace(/</g, \'&lt;\').replace(/>/g, \'&gt;\');};'],
-        re = /\{\s*([a-zA-Z\.\_0-9()]+)(\s*\|\s*safe)?\s*\}/m,
+        re = /{\s*([a-zA-Z._0-9()]+)(\s*\|\s*safe)?\s*}/m,
         addLine = function (text) {
-            code.push('r.push(\'' + text.replace(/\'/g, '\\\'').replace(/\n/g, ' \\n').replace(/\r/g, '\\r') + '\'); ');
+            code.push('r.push(\'' + text.replace(/'/g, '\\\'').replace(/\n/g, ' \\n').replace(/\r/g, '\\r') + '\'); ');
         };
     while (match === re.exec(tpl)) {
         if (match.index > 0) {
@@ -224,7 +230,7 @@ $(function () {
                 }
                 if (err) {
                     $alert.text(err.message ? err.message : (err.error ? err.error : err)).removeClass('uk-hidden').show();
-                    if (($alert.offset().top - 60) < $(window).scrollTo()) {
+                    if (($alert.offset().top - 60) < $(window).scrollTop()) {
                         $('html, body').animate({scrollTop: $alert.offset().top - 60});
                     }
                     if (fieldName) {
@@ -240,9 +246,9 @@ $(function () {
             return this.each(function () {
                 let
                     $form = $(this),
-                    $submit = $form && $form.fing('button[type=submit]'),
+                    $submit = $form && $form.find('button[type=submit]'),
                     $buttons = $form && $form.find('button'),
-                    $i = $submit && $submit.fing('i'),
+                    $i = $submit && $submit.find('i'),
                     iconClass = $i && $i.attr('class');
                 if (!$form.is('form')) {
                     console.error('Cannot call showFormLoading() on non-form object.');
@@ -261,7 +267,7 @@ $(function () {
                 }
             });
         },
-        postJson: function (url, data, callback) {
+        postJSON: function (url, data, callback) {
             if (arguments.length === 2) {
                 callback = data;
                 data = {};
@@ -284,7 +290,7 @@ $(function () {
 
 // ajax submit form:
 function _httpJSON(method, url, data, callback) {
-    let opt = {
+    const opt = {
         type: method,
         dataType: 'json'
     };
