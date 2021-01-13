@@ -7,10 +7,11 @@ import time
 
 from aiohttp import web
 
-from apis import APIValueError, APIError
+import markdown2
+from apis import APIValueError, APIError, APIPermissionError, Page
 from config import configs
 from coroweb import get, post
-from models import User, Blog, next_id
+from models import User, Blog, next_id, Comment
 
 _COOKIE_KEY = configs.session.secret
 COOKIE_NAME = "aw_session"
@@ -34,12 +35,42 @@ async def index(request):
     }
 
 
+@get("/api/blogs")
+async def api_blogs(*, page="1"):
+    page_index = get_page_index(page)
+    num = await Blog.find_number("count(id)")
+    p = Page(num, page_index)
+    if num == 0:
+        return dict(page=p, blogs=())
+    blogs = await Blog.find_all(order_by="created_at desc", limit=(p.offset, p.limit))
+    return dict(page=p, blogs=blogs)
+
+
+@get("/api/blogs/{id}")
+async def api_get_blog(*, _id):
+    return await Blog.find(_id)
+
+
 @get('/api/users')
 async def api_get_users():
     users = await User.find_all(order_by='created_at desc')
     for u in users:
-        u.pwd = "******"
+        u.pwd = "123123"
     return dict(users=users)
+
+
+@get("/blog/{id}")
+async def get_blog(_id):
+    blog = await Blog.find(_id)
+    comments = await Comment.find_all("blog_id=?", [_id], order_by="created_at desc")
+    for _ in comments:
+        _.html_content = text2html(_.content)
+    blog.html_content = markdown2.markdown(blog.content)
+    return {
+        "__template__": "blog.html",
+        "blog": blog,
+        "comments": comments
+    }
 
 
 @get('/login')
@@ -56,6 +87,23 @@ def logout(request):
     r.set_cookie(COOKIE_NAME, "-deleted-", max_age=0, httponly="True")
     logging.info("user logout.")
     return r
+
+
+@get("/manage/blogs")
+def manage_blogs(*, page="1"):
+    return {
+        "__template__": "manage_blogs.html",
+        "page_index": get_page_index(page)
+    }
+
+
+@get("/manage/blogs/create")
+def manage_create_blog():
+    return {
+        "__template__": "manage_blog_edit.html",
+        "id": "",
+        "action": "/api/blogs"
+    }
 
 
 @get('/register')
@@ -116,6 +164,27 @@ async def api_register_user(*, email, name, pwd):
     return r
 
 
+@post("/api/blogs")
+async def api_create_blog(request, *, name, summary, content):
+    check_admin(request)
+    if not name or not name.strip():
+        raise APIValueError("name", "name cannot be empty.")
+    if not summary or not summary.strip():
+        raise APIValueError("summary", "summary cannot be empty.")
+    if not content or not content.strip():
+        raise APIValueError("content", "content cannot be empty.")
+    blog = Blog(
+        user_id=request.__user__.id,
+        suer_name=request.__user__.name,
+        user_image=request.__user__.image,
+        name=name.strip(),
+        summary=summary.strip(),
+        content=content.strip()
+    )
+    await blog.save()
+    return blog
+
+
 async def cookie2user(cookie_str):
     """
     分析cookie，如果cookie有效则加载用户
@@ -138,11 +207,34 @@ async def cookie2user(cookie_str):
         if sha1 != hashlib.sha1(s.encode("utf-8")).hexdigest():
             logging.info("Invalid sha1")
             return None
-        user.pwd = "******"
+        user.pwd = "123123"
         return user
     except Exception as e:
         logging.exception(e)
         return None
+
+
+def check_admin(request):
+    if request.__user__ is None or not request.__user__.admin:
+        raise APIPermissionError()
+
+
+def get_page_index(page_str):
+    p = 1
+    try:
+        p = int(page_str)
+    except ValueError as v:
+        pass
+    return p if p > 1 else 1
+
+
+def text2html(text):
+    return "".join(
+        map(
+            lambda s: f"<p>{s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')}</p>",
+            filter(lambda s: s.strip() != "", text.split("\n"))
+        )
+    )
 
 
 def user2cookie(user, max_age):

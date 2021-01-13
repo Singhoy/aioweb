@@ -120,13 +120,13 @@ async def response_factory(app, handler):
         if isinstance(r, str):
             if r.startswith("redirect:"):
                 return web.HTTPFound(r[9:])
-            resp = web.Response(body=r.encode("utf8"))
+            resp = web.Response(body=r.encode("utf-8"))
             resp.content_type = "text/html;charset=utf-8"
             return resp
         if isinstance(r, dict):
             template = r.get("__template__")
             if template is None:
-                resp = web.Response(body=json.dumps(r, ensure_ascii=False, default=lambda o: o.__dict__).encode("utf8"))
+                resp = web.Response(body=json.dumps(r, ensure_ascii=False, default=lambda o: o.__dict__).encode("utf-8"))
                 resp.content_type = "application/json;charset=utf-8"
                 return resp
             else:
@@ -138,9 +138,9 @@ async def response_factory(app, handler):
             return web.Response(t)
         if isinstance(r, tuple) and len(r) == 2:
             t, m = r
-            if isinstance(r, int) and 100 <= t < 600:
+            if isinstance(t, int) and 100 <= t < 600:
                 return web.Response(t, str(m))
-        resp = web.Response(body=str(r).encode("utf8"))
+        resp = web.Response(body=str(r).encode("utf-8"))
         resp.content_type = "text/plain;charset=utf-8"
         return resp
 
